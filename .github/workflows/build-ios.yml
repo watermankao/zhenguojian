@@ -1,0 +1,73 @@
+# .github/workflows/build-ios.yml
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:          # 手动触发
+  # push:
+  #   branches: [ main ]
+  #   paths:
+  #     - 'lib/**'
+  #     - 'ios/**'
+  #     - 'native/**'
+  #     - 'scripts/build_ios.py'
+  #     - 'pubspec.yaml'
+
+jobs:
+  build:
+    runs-on: macos-15          # 或 macos-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.1"
+          cache: false
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.4"
+          channel: stable
+          cache: true
+
+      - name: Install CocoaPods
+        run: |
+          gem install cocoapods
+          pod --version
+
+      - name: Show environment
+        run: |
+          flutter --version
+          go version
+          xcodebuild -version
+          pod --version
+          sw_vers
+
+      - name: Build iOS (unsigned IPA, all sources)
+        env:
+          GOPROXY: https://goproxy.cn,direct
+          GOSUMDB: off
+        run: |
+          python3 scripts/build_ios.py --all-sources
+          # 如只需红果版，去掉 --all-sources 即可
+
+      - name: List outputs
+        if: always()
+        run: |
+          echo "=== dist/ios ==="
+          ls -la dist/ios 2>/dev/null || true
+          echo "=== build/ios ==="
+          ls -la build/ios 2>/dev/null || true
+
+      - name: Upload IPA artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zhenguojian-ios
+          path: |
+            dist/ios/**
+          if-no-files-found: warn
+          retention-days: 14
